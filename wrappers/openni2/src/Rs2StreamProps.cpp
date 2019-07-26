@@ -1,6 +1,12 @@
 #include "Rs2Driver.h"
 #include "PS1080.h"
 
+#define RS2_ENABLE_DEPTH_SHIFT_TABLES
+
+#if defined(RS2_ENABLE_DEPTH_SHIFT_TABLES)
+#include "XnDepthShiftTables.h"
+#endif
+
 static const unsigned long long GAIN_VAL = 42;
 static const unsigned long long CONST_SHIFT_VAL = 200;
 static const unsigned long long MAX_SHIFT_VAL = 2047;
@@ -81,30 +87,6 @@ OniStatus Rs2Stream::setProperty(int propertyId, const void* data, int dataSize)
 				float value = (float)*((int*)data);
 				rs2_set_option((const rs2_options*)m_sensor, RS2_OPTION_GAIN, value, &e);
 				if (e.success()) return ONI_STATUS_OK;
-			}
-			break;
-		}
-
-		case XN_STREAM_PROPERTY_S2D_TABLE:
-		{
-			if (data && m_oniType == ONI_SENSOR_DEPTH)
-			{
-				if (setTable(data, dataSize, m_s2d))
-				{
-					return ONI_STATUS_OK;
-				}
-			}
-			break;
-		}
-
-		case XN_STREAM_PROPERTY_D2S_TABLE:
-		{
-			if (data && m_oniType == ONI_SENSOR_DEPTH)
-			{
-				if (setTable(data, dataSize, m_d2s))
-				{
-					return ONI_STATUS_OK;
-				}
 			}
 			break;
 		}
@@ -284,7 +266,7 @@ OniStatus Rs2Stream::getProperty(int propertyId, void* data, int* dataSize)
 			break;
 		}
 
-        case XN_STREAM_PROPERTY_CONST_SHIFT:
+		case XN_STREAM_PROPERTY_CONST_SHIFT:
 		{
 			if (data && dataSize && *dataSize == sizeof(unsigned long long) && m_oniType == ONI_SENSOR_DEPTH)
 			{
@@ -294,7 +276,7 @@ OniStatus Rs2Stream::getProperty(int propertyId, void* data, int* dataSize)
 			break;
 		}
 
-        case XN_STREAM_PROPERTY_MAX_SHIFT:
+		case XN_STREAM_PROPERTY_MAX_SHIFT:
 		{
 			if (data && dataSize && *dataSize == sizeof(unsigned long long) && m_oniType == ONI_SENSOR_DEPTH)
 			{
@@ -304,7 +286,7 @@ OniStatus Rs2Stream::getProperty(int propertyId, void* data, int* dataSize)
 			break;
 		}
 
-        case XN_STREAM_PROPERTY_PARAM_COEFF:
+		case XN_STREAM_PROPERTY_PARAM_COEFF:
 		{
 			if (data && dataSize && *dataSize == sizeof(unsigned long long) && m_oniType == ONI_SENSOR_DEPTH)
 			{
@@ -314,7 +296,7 @@ OniStatus Rs2Stream::getProperty(int propertyId, void* data, int* dataSize)
 			break;
 		}
 
-        case XN_STREAM_PROPERTY_SHIFT_SCALE:
+		case XN_STREAM_PROPERTY_SHIFT_SCALE:
 		{
 			if (data && dataSize && *dataSize == sizeof(unsigned long long) && m_oniType == ONI_SENSOR_DEPTH)
 			{
@@ -324,7 +306,7 @@ OniStatus Rs2Stream::getProperty(int propertyId, void* data, int* dataSize)
 			break;
 		}
 
-        case XN_STREAM_PROPERTY_ZERO_PLANE_DISTANCE:
+		case XN_STREAM_PROPERTY_ZERO_PLANE_DISTANCE:
 		{
 			if (data && dataSize && *dataSize == sizeof(unsigned long long) && m_oniType == ONI_SENSOR_DEPTH)
 			{
@@ -334,7 +316,7 @@ OniStatus Rs2Stream::getProperty(int propertyId, void* data, int* dataSize)
 			break;
 		}
 
-        case XN_STREAM_PROPERTY_ZERO_PLANE_PIXEL_SIZE:
+		case XN_STREAM_PROPERTY_ZERO_PLANE_PIXEL_SIZE:
 		{
 			if (data && dataSize && *dataSize == sizeof(double) && m_oniType == ONI_SENSOR_DEPTH)
 			{
@@ -344,7 +326,7 @@ OniStatus Rs2Stream::getProperty(int propertyId, void* data, int* dataSize)
 			break;
 		}
 
-        case XN_STREAM_PROPERTY_EMITTER_DCMOS_DISTANCE:
+		case XN_STREAM_PROPERTY_EMITTER_DCMOS_DISTANCE:
 		{
 			if (data && dataSize && *dataSize == sizeof(double) && m_oniType == ONI_SENSOR_DEPTH)
 			{
@@ -354,29 +336,31 @@ OniStatus Rs2Stream::getProperty(int propertyId, void* data, int* dataSize)
 			break;
 		}
 
+#if defined(RS2_ENABLE_DEPTH_SHIFT_TABLES)
+
 		case XN_STREAM_PROPERTY_S2D_TABLE:
 		{
-			if (data && dataSize && m_oniType == ONI_SENSOR_DEPTH)
+			if (data && dataSize && *dataSize >= sizeof(S2D) && m_oniType == ONI_SENSOR_DEPTH)
 			{
-				if (getTable(data, dataSize, m_s2d))
-				{
-					return ONI_STATUS_OK;
-				}
+				memcpy(data, S2D, sizeof(S2D));
+				*dataSize = sizeof(S2D);
+				return ONI_STATUS_OK;
 			}
 			break;
 		}
 
 		case XN_STREAM_PROPERTY_D2S_TABLE:
 		{
-			if (data && dataSize && m_oniType == ONI_SENSOR_DEPTH)
+			if (data && dataSize && *dataSize >= sizeof(D2S) && m_oniType == ONI_SENSOR_DEPTH)
 			{
-				if (getTable(data, dataSize, m_d2s))
-				{
-					return ONI_STATUS_OK;
-				}
+				memcpy(data, D2S, sizeof(D2S));
+				*dataSize = sizeof(D2S);
+				return ONI_STATUS_OK;
 			}
 			break;
 		}
+
+#endif // RS2_ENABLE_DEPTH_SHIFT_TABLES
 
 		default:
 		{
@@ -404,7 +388,6 @@ OniBool Rs2Stream::isPropertySupported(int propertyId)
 		case ONI_STREAM_PROPERTY_STRIDE:				// int
 		case ONI_STREAM_PROPERTY_MIRRORING:				// OniBool
 			return true;
-
 		
 		case ONI_STREAM_PROPERTY_NUMBER_OF_FRAMES:		// int
 			return false;
@@ -416,16 +399,20 @@ OniBool Rs2Stream::isPropertySupported(int propertyId)
 			return true;
 
 		case XN_STREAM_PROPERTY_GAIN:
-        case XN_STREAM_PROPERTY_CONST_SHIFT:
-        case XN_STREAM_PROPERTY_MAX_SHIFT:
-        case XN_STREAM_PROPERTY_PARAM_COEFF:
-        case XN_STREAM_PROPERTY_SHIFT_SCALE:
-        case XN_STREAM_PROPERTY_ZERO_PLANE_DISTANCE:
-        case XN_STREAM_PROPERTY_ZERO_PLANE_PIXEL_SIZE:
-        case XN_STREAM_PROPERTY_EMITTER_DCMOS_DISTANCE:
-        case XN_STREAM_PROPERTY_S2D_TABLE:
-        case XN_STREAM_PROPERTY_D2S_TABLE:
+		case XN_STREAM_PROPERTY_CONST_SHIFT:
+		case XN_STREAM_PROPERTY_MAX_SHIFT:
+		case XN_STREAM_PROPERTY_PARAM_COEFF:
+		case XN_STREAM_PROPERTY_SHIFT_SCALE:
+		case XN_STREAM_PROPERTY_ZERO_PLANE_DISTANCE:
+		case XN_STREAM_PROPERTY_ZERO_PLANE_PIXEL_SIZE:
+		case XN_STREAM_PROPERTY_EMITTER_DCMOS_DISTANCE:
 			return true;
+
+#if defined(RS2_ENABLE_DEPTH_SHIFT_TABLES)
+		case XN_STREAM_PROPERTY_S2D_TABLE:
+		case XN_STREAM_PROPERTY_D2S_TABLE:
+			return true;
+#endif
 
 		default:
 			return false;

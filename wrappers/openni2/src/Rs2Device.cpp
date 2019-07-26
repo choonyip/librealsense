@@ -7,6 +7,8 @@
 #define WAIT_FRAMESET_TIMEOUT_MS 2000
 #define WAIT_ALIGNED_DEPTH_TIMEOUT_MS 100
 
+#define RS2_PROJECT_POINT_TO_PIXEL 0x1000
+
 namespace oni { namespace driver {
 
 Rs2Device::Rs2Device(Rs2Driver* driver, rs2_device* device)
@@ -25,6 +27,12 @@ Rs2Device::Rs2Device(Rs2Driver* driver, rs2_device* device)
 {
 	rsLogDebug("+Rs2Device");
 }
+
+struct Rs2PointPixel
+{
+	float point[3];
+	float pixel[2];
+};
 
 Rs2Device::~Rs2Device()
 {
@@ -206,17 +214,13 @@ OniStatus Rs2Device::invoke(int commandId, void* data, int dataSize)
 			Rs2Stream* stream = *iter;
 			if (stream->getOniType() == ONI_SENSOR_DEPTH)
 			{
-				auto pp = (Rs2PointPixel*)data;
-				rs2_project_point_to_pixel(pp->pixel, &stream->m_intrinsics, pp->point);
+				auto proj = (Rs2PointPixel*)data;
+				rs2_project_point_to_pixel(proj->pixel, &stream->m_intrinsics, proj->point);
 				return ONI_STATUS_OK;
 			}
 		}
-		return ONI_STATUS_NO_DEVICE;
 	}
-
-	#if defined(RS2_TRACE_NOT_SUPPORTED_CMDS)
-		rsTraceError("Not supported: commandId=%d", commandId);
-	#endif
+		
 	return ONI_STATUS_NOT_SUPPORTED;
 }
 
